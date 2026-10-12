@@ -1,6 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  'http://127.0.0.1:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8010';
 
 const ACCESS_TOKEN_KEYS = [
   'mealbridge_access_token',
@@ -139,7 +137,7 @@ async function request(
   } catch (error) {
     const networkError =
       new Error(
-        'Unable to connect to MealBridge backend. Make sure FastAPI is running on http://127.0.0.1:8000.'
+        'Unable to connect to MealBridge backend. Make sure FastAPI is running on http://127.0.0.1:8010.'
       );
 
     networkError.cause =

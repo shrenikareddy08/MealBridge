@@ -50,3 +50,26 @@ lerna-debug.log*
 # Agent & Workspace Temporary Metadata
 .gemini/
 scratch/
+# Secrets and environment variables
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.envs/
+
+# Node
+node_modules/
+dist/
+build/
+
+# macOS
+.DS_Store
+
+# Logs and local database backups
+*.log

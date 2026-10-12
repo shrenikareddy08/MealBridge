@@ -7,9 +7,13 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
+
+ARG VITE_API_BASE_URL=http://127.0.0.1:8010
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
 RUN npm run build
 
-# Stage 2: Serve with Nginx
+# Stage 2: Serve the frontend using Nginx
 FROM nginx:alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html

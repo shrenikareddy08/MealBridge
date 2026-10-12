@@ -5,20 +5,22 @@ services:
   mealbridge-db:
     image: pgvector/pgvector:pg16
     container_name: mealbridge-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-MealBridge_food_donation}
     ports:
-      - "${POSTGRES_PORT:-5434}:5432"
+      - "${POSTGRES_PORT:-5435}:5432"
     volumes:
       - ./database/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d MealBridge_food_donation"]
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - mealbridge-net
 
@@ -28,8 +30,9 @@ services:
   mealbridge-mongo:
     image: mongo:7.0
     container_name: mealbridge-mongo
+    restart: unless-stopped
     ports:
-      - "${MONGO_PORT:-27017}:27017"
+      - "${MONGO_PORT:-27018}:27017"
     volumes:
       - mongodata:/data/db
     healthcheck:
@@ -37,18 +40,19 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
     networks:
       - mealbridge-net
 
   # ===========================================================================
-  # 3. FastAPI Core Backend Monolith & Gateway (CO1, CO2, CO3, CO5, CO6)
+  # 3. FastAPI Core Backend and Gateway
   # ===========================================================================
   mealbridge-backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: mealbridge-backend
-    restart: always
+    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -59,18 +63,18 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-MealBridge_food_donation}
       MONGO_URL: mongodb://mealbridge-mongo:27017/mealbridge_auth
       ACTIVITY_SERVICE_URL: http://mealbridge-activity-service:5001
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-mealbridge_super_secure_jwt_secret_key_2026}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in your .env file}
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 1440
       SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
       SMTP_PORT: ${SMTP_PORT:-465}
-      SMTP_USERNAME: ${SMTP_USERNAME:-${SMTP_USER:-}}
-      SMTP_USER: ${SMTP_USER:-${SMTP_USERNAME:-}}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-${FROM_EMAIL:-no-reply@mealbridge.org}}
-      FROM_EMAIL: ${FROM_EMAIL:-${SMTP_FROM_EMAIL:-no-reply@mealbridge.org}}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-no-reply@mealbridge.org}
+      FROM_EMAIL: ${FROM_EMAIL:-no-reply@mealbridge.org}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-MealBridge}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5174}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       SMS_PROVIDER: ${SMS_PROVIDER:-generic}
       SMS_API_KEY: ${SMS_API_KEY:-}
@@ -80,7 +84,7 @@ services:
       FAST2SMS_TEMPLATE_ID: ${FAST2SMS_TEMPLATE_ID:-}
       FAST2SMS_OTP_ID: ${FAST2SMS_OTP_ID:-}
     ports:
-      - "8000:8000"
+      - "8010:8000"
     volumes:
       - ./backend:/app
     depends_on:
@@ -88,18 +92,20 @@ services:
         condition: service_healthy
       mealbridge-mongo:
         condition: service_healthy
+      mealbridge-activity-service:
+        condition: service_started
     networks:
       - mealbridge-net
 
   # ===========================================================================
-  # 4. Node.js Activity Microservice (CO4, CO5, CO6)
+  # 4. Node.js Activity Microservice
   # ===========================================================================
   mealbridge-activity-service:
     build:
       context: ./microservices/activity-service
       dockerfile: Dockerfile
     container_name: mealbridge-activity-service
-    restart: always
+    restart: unless-stopped
     environment:
       PORT: 5001
       MONGO_URL: mongodb://mealbridge-mongo:27017/mealbridge_auth_activity
@@ -112,36 +118,37 @@ services:
       - mealbridge-net
 
   # ===========================================================================
-  # 5. React Frontend + Nginx Reverse Proxy (CO6)
+  # 5. React Frontend with Nginx
   # ===========================================================================
   mealbridge-frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: mealbridge-frontend
-    restart: always
+    restart: unless-stopped
     ports:
-      - "5173:80"
-    volumes:
-      - ./frontend/dist:/usr/share/nginx/html:ro
+      - "5174:80"
     depends_on:
-      - mealbridge-backend
+      mealbridge-backend:
+        condition: service_started
     networks:
       - mealbridge-net
 
   # ===========================================================================
-  # 6. pgAdmin Relational Catalog Management (CO1 Catalog Tools)
+  # 6. pgAdmin Relational Database Management
   # ===========================================================================
   mealbridge-pgadmin:
     image: dpage/pgadmin4:latest
     container_name: mealbridge-pgadmin
+    restart: unless-stopped
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@mealbridge.org}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?Set PGADMIN_PASSWORD in your .env file}
     ports:
       - "5050:80"
     depends_on:
-      - mealbridge-db
+      mealbridge-db:
+        condition: service_healthy
     networks:
       - mealbridge-net
 
